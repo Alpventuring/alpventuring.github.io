@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>ALPVENTURING | Moto Kamp &amp; Tur</title>
-<meta name="description" content="Tiger 900 ile dağlarda, göl kenarlarında ve boş koylarda tek başıma kamp yapıyorum. Konuşma az; yağmur, ateş ve yol sesi çok.">
+<meta name="description" content="Selam, ben Alp. Hayatın gürültüsünden kaçıp kendimi motosikletle yollara, doğaya ve sessizliğe atıyorum.">
 <meta name="theme-color" content="#0b0910">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -12,7 +12,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="ALPVENTURING">
 <meta property="og:title" content="ALPVENTURING | Moto Kamp &amp; Tur">
-<meta property="og:description" content="Tiger 900 ile dağlarda, göl kenarlarında ve boş koylarda tek başıma kamp yapıyorum. Konuşma az; yağmur, ateş ve yol sesi çok.">
+<meta property="og:description" content="Selam, ben Alp. Hayatın gürültüsünden kaçıp kendimi motosikletle yollara, doğaya ve sessizliğe atıyorum.">
 <meta property="og:url" content="https://alpventuring.github.io/">
 <meta property="og:image" content="https://alpventuring.github.io/og.jpg">
 <meta property="og:image:type" content="image/jpeg">
@@ -38,6 +38,7 @@
   --plate-hi: #211a2b;     /* üzerine gelince levha, piktogram zemini */
   --keyline: #3a2e48;      /* levha iç çerçevesi, ayraçlar */
   --keyline-hi: #9a67b0;   /* odak ve üzerine gelince çerçeve */
+  --zone-hover: #3b2650;   /* figürde üzerine gelinen bölge */
   --ink: #f6f2f9;          /* ana metin */
   --dust: #aa9db7;         /* ikincil metin */
   --purple: #ab44c7;       /* marka moru */
@@ -314,6 +315,66 @@ body {
 .gear-block { display: flex; flex-direction: column; gap: 8px; margin-top: 26px; }
 .gear-block h3 { margin: 0; font: 700 1.125rem/1.1 var(--f-display); letter-spacing: 0.05em; text-transform: uppercase; }
 
+/* sürücü figürü: bölgeye dokununca listedeki satır öne çıkar */
+.fit { display: grid; grid-template-columns: 124px minmax(0, 1fr); gap: 16px; align-items: start; }
+.rider { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.rider svg { display: block; width: 100%; height: auto; overflow: visible; }
+.rider figcaption {
+  font: 500 var(--t-xs)/1.3 var(--f-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--dust);
+}
+.zone {
+  fill: var(--plate-hi);
+  stroke: var(--keyline-hi);
+  stroke-width: 1.2;
+  stroke-linejoin: round;
+  cursor: pointer;
+  transition: fill 0.18s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.zone:hover { fill: var(--zone-hover); }
+.zone:focus { outline: none; }
+.zone:focus-visible { stroke: var(--lilac); stroke-width: 2.2; }
+.zone.on { fill: var(--purple); stroke: var(--lilac); }
+.rider .detail { fill: none; stroke: var(--keyline-hi); stroke-width: 1; stroke-linecap: round; opacity: 0.75; pointer-events: none; }
+.rider .visor { fill: var(--night); pointer-events: none; }
+.rider .mesh { fill: url(#mesh); pointer-events: none; }
+.mesh-dot { fill: var(--lilac); opacity: 0.5; }
+.rider .mesh, .rider .buff { display: none; }
+.rider[data-season="yaz"] .mesh, .rider[data-season="kis"] .buff { display: inline; }
+.pin { pointer-events: none; }
+.pin circle { fill: var(--purple); stroke: var(--night); stroke-width: 1.5; }
+.pin text { fill: var(--chalk); font: 700 9px/1 var(--f-mono); text-anchor: middle; dominant-baseline: central; }
+.pin.on circle { fill: var(--chalk); }
+.pin.on text { fill: var(--purple); }
+.spec--stack .spec__row { grid-template-columns: minmax(0, 1fr); gap: 3px; padding-block: 9px; }
+.spec--stack dt { display: flex; align-items: center; gap: 7px; line-height: 1.4; }
+.spec__row[data-zone] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.spec__row[data-zone]:focus { outline: none; }
+.spec__row[data-zone]:focus-visible { outline: 2px solid var(--lilac); outline-offset: 2px; }
+.num {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font: 700 10px/1 var(--f-mono);
+  letter-spacing: 0;
+  color: var(--lilac);
+  background: var(--plate-hi);
+  box-shadow: inset 0 0 0 1px var(--keyline-hi);
+}
+.spec__row.on dt { color: var(--lilac); }
+.spec__row.on dd { color: var(--chalk); font-weight: 600; }
+.spec__row.on .num { color: var(--chalk); background: var(--purple); box-shadow: none; }
+@media (max-width: 360px) {
+  .fit { grid-template-columns: 100px minmax(0, 1fr); gap: 12px; }
+}
+
 .foot {
   display: flex;
   flex-wrap: wrap;
@@ -329,7 +390,7 @@ body {
   .page { padding-block: 40px 64px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .plate, .plate::after, .arrow, .seg button { transition: none; }
+  .plate, .plate::after, .arrow, .seg button, .zone { transition: none; }
   .plate:active { transform: none; }
 }
 </style>
@@ -356,7 +417,7 @@ body {
       </div>
       <h1 class="name" id="name">ALPVENTURING</h1>
       <p class="handle">@alpventuring</p>
-      <p class="bio" data-i18n="bio">Tiger 900 ile dağlarda, göl kenarlarında ve boş koylarda tek başıma kamp yapıyorum. Konuşma az; yağmur, ateş ve yol sesi çok.</p>
+      <p class="bio" data-i18n="bio">Selam, ben Alp. Hayatın gürültüsünden kaçıp kendimi motosikletle yollara, doğaya ve sessizliğe atıyorum.</p>
       <p class="loc">
         <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="5"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4"/></svg>
         <span data-i18n="loc">Antalya · 36.90°K 30.71°D</span>
@@ -436,11 +497,31 @@ body {
     </div>
     <div class="seg-panel" id="seg-panel" role="tabpanel" aria-labelledby="tab-kis">
       <p class="seg-note" id="seg-note"></p>
-      <dl class="spec" id="seg-list"></dl>
-    </div>
-    <div class="gear-block">
-      <h3 data-i18n="allH">Her mevsim</h3>
-      <dl class="spec" id="all-list"></dl>
+      <div class="fit">
+        <figure class="rider" id="rider" data-season="kis">
+          <svg viewBox="0 0 120 250" role="group" aria-label="Sürücü figürü">
+            <defs>
+              <pattern id="mesh" width="4" height="4" patternUnits="userSpaceOnUse"><circle class="mesh-dot" cx="2" cy="2" r="0.75"/></pattern>
+            </defs>
+            <path class="zone" data-zone="pantolon" d="M38 132 L82 132 L79 212 L63 212 L60 147 L57 212 L41 212 Z"/>
+            <path class="zone" data-zone="bot" d="M40 211 L58 211 L59 236 Q49 243 37 239 Z M62 211 L80 211 L83 239 Q71 243 61 236 Z"/>
+            <path class="zone" data-zone="mont" d="M42 60 L78 60 L92 70 L100 126 L89 128 L82 89 L82 134 L38 134 L38 89 L31 128 L20 126 L28 70 Z"/>
+            <path class="mesh" d="M42 60 L78 60 L92 70 L100 126 L89 128 L82 89 L82 134 L38 134 L38 89 L31 128 L20 126 L28 70 Z"/>
+            <path class="zone" data-zone="eldiven" d="M19.5 126 L31.5 128.5 L31 143 Q25 149 18 143 Z M100.5 126 L88.5 128.5 L89 143 Q95 149 102 143 Z"/>
+            <path class="zone buff" data-zone="boyun" d="M50 55 H70 V63 Q60 66 50 63 Z"/>
+            <path class="zone" data-zone="kask" d="M40 34 C40 18 50 10 60 10 C70 10 80 18 80 34 L80 44 C80 52 72 57 60 57 C48 57 40 52 40 44 Z M34 21 Q60 6 86 21 L81 26 Q60 14 39 26 Z"/>
+            <rect class="visor" x="45" y="27" width="30" height="13" rx="5"/>
+            <path class="detail" d="M60 62 V133 M45 84 H54 M66 84 H75 M38 120 H82 M45 172 H56 M64 172 H75 M54 50 H66"/>
+            <g class="pin" data-zone="kask"><circle cx="72" cy="47" r="7"/><text x="72" y="47">1</text></g>
+            <g class="pin" data-zone="mont"><circle cx="71" cy="102" r="7"/><text x="71" y="102">2</text></g>
+            <g class="pin" data-zone="eldiven"><circle cx="95" cy="137" r="7"/><text x="95" y="137">3</text></g>
+            <g class="pin" data-zone="pantolon"><circle cx="71" cy="182" r="7"/><text x="71" y="182">4</text></g>
+            <g class="pin" data-zone="bot"><circle cx="72" cy="227" r="7"/><text x="72" y="227">5</text></g>
+          </svg>
+          <figcaption data-i18n="tapHint">Bölgeye dokun</figcaption>
+        </figure>
+        <dl class="spec spec--stack" id="seg-list"></dl>
+      </div>
     </div>
     <div class="gear-block">
       <h3 data-i18n="filmH">Çekim ekipmanı</h3>
@@ -463,39 +544,47 @@ body {
   const RELEASE = { weekday: 0, hour: 20, utcOffset: 3 }; // Pazar 20:00, Türkiye saati (UTC+3)
   const LIVE_HOURS = 3;                                   // yayından sonra kaç saat "Yeni video yayında" yazsın
 
-  /* Ekipman: her satır { k: etiket, v: model }. Türkçe ve İngilizcesi farklıysa L("türkçe", "english") yaz. */
+  /* Ekipman: her satır { z: figürdeki bölge, k: etiket, v: model }.
+     Bölgeler: kask, mont, eldiven, pantolon, bot, boyun. Bölgesi olmayan satırlar (çanta gibi) yalnızca listede durur.
+     Türkçe ve İngilizcesi farklıysa L("türkçe", "english") yaz. */
   const L = (tr, en) => ({ tr, en });
+  const HELMETS = "HJC i80 · Arai Concept-X";
+  const BOOTS = "Dainese Freeland 2 GTX";
   const GEAR = {
     yaz: {
       note: L("Sıcak günlerde giydiklerim.", "What I wear on hot days."),
       items: [
-        { k: L("Mont", "Jacket"), v: "Rev'it Eclipse 2" },
-        { k: L("Pantolon", "Pants"), v: L("4Riders denim motosiklet pantolonu", "4Riders riding jeans") },
-        { k: L("Eldiven", "Gloves"), v: "Klim Marrakesh · Knox Orsa OR4" }
+        { z: "kask", k: L("Kask", "Helmets"), v: HELMETS },
+        { z: "mont", k: L("Mont", "Jacket"), v: "Rev'it Eclipse 2" },
+        { z: "eldiven", k: L("Eldiven", "Gloves"), v: "Klim Marrakesh · Knox Orsa OR4" },
+        { z: "pantolon", k: L("Pantolon", "Pants"), v: L("4Riders denim motosiklet pantolonu", "4Riders riding jeans") },
+        { z: "bot", k: L("Bot", "Boots"), v: BOOTS }
       ]
     },
     kis: {
       note: L("Soğuk ve yağmurlu günlerde giydiklerim.", "What I wear on cold and rainy days."),
       items: [
-        { k: L("Takım", "Suit"), v: L("Dainese Carve Master 3 Gore-Tex mont ve pantolon", "Dainese Carve Master 3 Gore-Tex jacket and pants") },
-        { k: L("Deri mont", "Leather jacket"), v: "Dainese Istrice QDF" },
-        { k: L("Eldiven", "Gloves"), v: "Dainese Fulmine D-Dry" },
-        { k: L("Boyunluk", "Neck warmer"), v: "Buff" }
+        { z: "kask", k: L("Kask", "Helmets"), v: HELMETS },
+        { z: "mont", k: L("Mont", "Jackets"), v: L("Dainese Carve Master 3 Gore-Tex · Dainese Istrice QDF (deri)", "Dainese Carve Master 3 Gore-Tex · Dainese Istrice QDF (leather)") },
+        { z: "eldiven", k: L("Eldiven", "Gloves"), v: "Dainese Fulmine D-Dry" },
+        { z: "pantolon", k: L("Pantolon", "Pants"), v: "Dainese Carve Master 3 Gore-Tex" },
+        { z: "bot", k: L("Bot", "Boots"), v: BOOTS },
+        { z: "boyun", k: L("Boyunluk", "Neck warmer"), v: "Buff" }
       ]
     },
     uzun: {
       note: L("Çok günlük turlarda kullandıklarım.", "What I use on multi-day trips."),
       items: [
-        { k: L("Mont", "Jacket"), v: "Rev'it Voltiac 3 H2O" },
+        { z: "kask", k: L("Kask", "Helmets"), v: HELMETS },
+        { z: "mont", k: L("Mont", "Jacket"), v: "Rev'it Voltiac 3 H2O" },
+        { z: "eldiven", k: L("Eldiven", "Gloves"), v: "Klim Marrakesh" },
+        { z: "pantolon", k: L("Pantolon", "Pants"), v: "Dainese Carve Master 3 Gore-Tex" },
+        { z: "bot", k: L("Bot", "Boots"), v: BOOTS },
         { k: L("Çanta", "Bags"), v: L("Rhinowalk Mechanical 8L crash bar çantaları", "Rhinowalk Mechanical 8L crash bar bags") },
         { k: L("Yağmur", "Rain"), v: L("Rev'it yağmur pantolonu · Decathlon yağmurluk", "Rev'it rain pants · Decathlon rain jacket") }
       ]
     }
   };
-  const ALL_YEAR = [
-    { k: L("Kask", "Helmets"), v: "HJC i80 · Arai Concept-X" },
-    { k: L("Bot", "Boots"), v: "Dainese Freeland 2 GTX" }
-  ];
   const FILMING = [
     { k: L("Kamera", "Cameras"), v: "DJI Osmo Action 4 · Insta360 X5 · Canon 250D" },
     { k: L("Mikrofon", "Microphone"), v: "DJI Mic 3" }
@@ -505,7 +594,7 @@ body {
 
   const T = {
     tr: {
-      bio: "Tiger 900 ile dağlarda, göl kenarlarında ve boş koylarda tek başıma kamp yapıyorum. Konuşma az; yağmur, ateş ve yol sesi çok.",
+      bio: "Selam, ben Alp. Hayatın gürültüsünden kaçıp kendimi motosikletle yollara, doğaya ve sessizliğe atıyorum.",
       loc: "Antalya · 36.90°K 30.71°D",
       cta: "YouTube'da abone ol",
       next: "Sıradaki video",
@@ -517,13 +606,13 @@ body {
       l4: "İş birliği", l4s: "Marka ve sponsorluk teklifleri için mesaj at",
       mailLabel: "E-posta", copy: "Kopyala", copied: "Kopyalandı",
       gearH: "Ekipman", gearIntro: "Motosikletim Triumph Tiger 900 Rally Pro. Diğer ekipmanım mevsime ve yola göre değişiyor.",
-      segYaz: "Yaz", segKis: "Kış", segUzun: "Uzun yol", segLabel: "Ekipman", allH: "Her mevsim", filmH: "Çekim ekipmanı",
+      segYaz: "Yaz", segKis: "Kış", segUzun: "Uzun yol", segLabel: "Ekipman", filmH: "Çekim ekipmanı", tapHint: "Bölgeye dokun", riderLabel: "Sürücü figürü",
       foot: "Her Pazar 20:00'de yeni video",
       navLabel: "Linkler",
       scene: "Gece kampı: dağların eteğinde ışığı yanan bir çadır, yanında motosiklet ve kamp ateşi"
     },
     en: {
-      bio: "Solo camping in the mountains, by lakes and in empty coves on a Tiger 900. Little talking; lots of rain, fire and road sounds.",
+      bio: "Hi, I'm Alp. I escape the noise of everyday life on my motorcycle and head for open roads, nature and quiet.",
       loc: "Antalya · 36.90°N 30.71°E",
       cta: "Subscribe on YouTube",
       next: "Next video",
@@ -535,7 +624,7 @@ body {
       l4: "Collaborations", l4s: "Message me about brand and sponsorship offers",
       mailLabel: "Email", copy: "Copy", copied: "Copied",
       gearH: "Gear", gearIntro: "I ride a Triumph Tiger 900 Rally Pro. The rest of my gear changes with the season and the trip.",
-      segYaz: "Summer", segKis: "Winter", segUzun: "Touring", segLabel: "Gear", allH: "All year", filmH: "Filming gear",
+      segYaz: "Summer", segKis: "Winter", segUzun: "Touring", segLabel: "Gear", filmH: "Filming gear", tapHint: "Tap a part", riderLabel: "Rider figure",
       foot: "New video every Sunday, 20:00 Türkiye time",
       navLabel: "Links",
       scene: "Night camp: a glowing tent below the mountains, with a motorcycle and a campfire beside it"
@@ -621,15 +710,68 @@ body {
   }
   document.querySelectorAll(".lang button").forEach(b => b.addEventListener("click", () => applyLang(b.dataset.lang, true)));
 
-  /* ---------- ekipman sekmeleri ---------- */
+  /* ---------- ekipman sekmeleri ve sürücü figürü ---------- */
   const SEGS = ["yaz", "kis", "uzun"];
+  const ZONE_NUM = { kask: 1, mont: 2, eldiven: 3, pantolon: 4, bot: 5 };
   const segTabs = Array.from(document.querySelectorAll("#seg-tabs [role='tab']"));
   const segPanel = document.getElementById("seg-panel");
   const segNote = document.getElementById("seg-note");
   const segList = document.getElementById("seg-list");
   const filmList = document.getElementById("film-list");
-  const allList = document.getElementById("all-list");
+  const rider = document.getElementById("rider");
+  const riderSvg = rider.querySelector("svg");
+  const zones = Array.from(rider.querySelectorAll(".zone"));
+  const pins = Array.from(rider.querySelectorAll(".pin"));
+  let activeZone = null;
   const pick = v => (typeof v === "string" ? v : v[lang] || v.tr);
+  const onKey = fn => e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); fn(); }
+  };
+  function applyZone() {
+    zones.forEach(z => z.classList.toggle("on", z.dataset.zone === activeZone));
+    pins.forEach(p => p.classList.toggle("on", p.dataset.zone === activeZone));
+    segList.querySelectorAll(".spec__row[data-zone]").forEach(r => {
+      const on = r.dataset.zone === activeZone;
+      r.classList.toggle("on", on);
+      r.setAttribute("aria-pressed", String(on));
+    });
+  }
+  function toggleZone(z) {
+    activeZone = activeZone === z ? null : z;
+    applyZone();
+  }
+  zones.forEach(z => {
+    z.setAttribute("tabindex", "0");
+    z.setAttribute("role", "button");
+    z.addEventListener("click", () => toggleZone(z.dataset.zone));
+    z.addEventListener("keydown", onKey(() => toggleZone(z.dataset.zone)));
+  });
+  function fillFit(list) {
+    segList.textContent = "";
+    list.forEach(r => {
+      const row = document.createElement("div");
+      row.className = "spec__row";
+      const dt = document.createElement("dt");
+      if (r.z) {
+        row.dataset.zone = r.z;
+        row.tabIndex = 0;
+        row.setAttribute("role", "button");
+        if (ZONE_NUM[r.z]) {
+          const n = document.createElement("span");
+          n.className = "num";
+          n.textContent = ZONE_NUM[r.z];
+          dt.append(n);
+        }
+        row.addEventListener("click", () => toggleZone(r.z));
+        row.addEventListener("keydown", onKey(() => toggleZone(r.z)));
+      }
+      dt.append(document.createTextNode(pick(r.k)));
+      const dd = document.createElement("dd");
+      dd.textContent = pick(r.v);
+      row.append(dt, dd);
+      segList.append(row);
+    });
+  }
   function fillRows(dl, list) {
     dl.textContent = "";
     list.forEach(r => {
@@ -646,9 +788,17 @@ body {
   function renderGear() {
     const g = GEAR[seg] || GEAR.yaz;
     segNote.textContent = pick(g.note);
-    fillRows(segList, g.items);
-    fillRows(allList, ALL_YEAR);
+    rider.dataset.season = seg;
+    riderSvg.setAttribute("aria-label", T[lang].riderLabel);
+    fillFit(g.items);
     fillRows(filmList, FILMING);
+    zones.forEach(z => {
+      const item = g.items.find(i => i.z === z.dataset.zone);
+      if (item) z.setAttribute("aria-label", pick(item.k) + ": " + pick(item.v));
+      else z.removeAttribute("aria-label");
+    });
+    if (activeZone && !g.items.some(i => i.z === activeZone)) activeZone = null;
+    applyZone();
     segTabs.forEach(b => {
       const on = b.dataset.seg === seg;
       b.setAttribute("aria-selected", String(on));
