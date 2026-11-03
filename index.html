@@ -98,7 +98,7 @@ body {
   overflow: hidden;
   background: var(--plate);
 }
-.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.hero canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; image-rendering: pixelated; }
 .lang {
   position: absolute;
   top: 10px;
@@ -399,7 +399,7 @@ body {
 <div class="page" id="page" lang="tr">
   <div class="top">
     <header class="hero">
-      <canvas id="scene" role="img" aria-label="Gece kampı: dağların eteğinde ışığı yanan bir çadır, yanında motosiklet ve kamp ateşi"></canvas>
+      <canvas id="scene" role="img" aria-label="Piksel sanat gece sahnesi: halkalı bir gezegenin altında dağ yolunda ilerleyen motosikletli sürücü"></canvas>
       <div class="lang" role="group" aria-label="Dil / Language">
         <button type="button" id="lang-tr" data-lang="tr" aria-pressed="true">TR</button>
         <button type="button" id="lang-en" data-lang="en" aria-pressed="false">EN</button>
@@ -609,7 +609,7 @@ body {
       segYaz: "Yaz", segKis: "Kış", segUzun: "Uzun yol", segLabel: "Ekipman", filmH: "Çekim ekipmanı", tapHint: "Bölgeye dokun", riderLabel: "Sürücü figürü",
       foot: "Her Pazar 20:00'de yeni video",
       navLabel: "Linkler",
-      scene: "Gece kampı: dağların eteğinde ışığı yanan bir çadır, yanında motosiklet ve kamp ateşi"
+      scene: "Piksel sanat gece sahnesi: halkalı bir gezegenin altında dağ yolunda ilerleyen motosikletli sürücü"
     },
     en: {
       bio: "Hi, I'm Alp. I escape the noise of everyday life on my motorcycle and head for open roads, nature and quiet.",
@@ -627,7 +627,7 @@ body {
       segYaz: "Summer", segKis: "Winter", segUzun: "Touring", segLabel: "Gear", filmH: "Filming gear", tapHint: "Tap a part", riderLabel: "Rider figure",
       foot: "New video every Sunday, 20:00 Türkiye time",
       navLabel: "Links",
-      scene: "Night camp: a glowing tent below the mountains, with a motorcycle and a campfire beside it"
+      scene: "Pixel art night scene: a rider on a motorcycle on a mountain road under a ringed planet"
     }
   };
 
@@ -852,14 +852,18 @@ body {
     });
   }
 
-  /* ---------- gece kamp sahnesi ---------- */
+  /* ---------- gece sahnesi: 32-bit piksel sanat ---------- */
   function initScene() {
     const cv = document.getElementById("scene");
     const ctx = cv.getContext && cv.getContext("2d");
     if (!ctx) return;
-    let W = 1, H = 1, dpr = 1, u = 10;
-    let sky = null, land = null, stars = [], sparks = [];
-    let onScreen = true, rafId = 0, lastDraw = 0, tNow = 0;
+    const off = document.createElement("canvas");
+    const g = off.getContext("2d");
+    const SPEED = 34; // yol hızı (sanat pikseli / saniye)
+    let aw = 172, ah = 102, s = 4, roadTop = 88, contactY = 96, campX = 60;
+    let sky = null, far = null, mid = null, near = null, frames = [], stars = [];
+    let shoot = null, nextShoot = 1.5;
+    let onScreen = true, rafId = 0, lastDraw = 0, t0 = 0, tNow = 0;
 
     const rng = seed => () => {
       seed |= 0;
@@ -868,291 +872,381 @@ body {
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
-    function ridge(rand, base, amp, rough) {
-      let pts = [base + (rand() - 0.5) * amp, base + (rand() - 0.5) * amp];
-      let disp = amp;
-      while (pts.length < 129) {
-        const nx = [];
-        for (let i = 0; i < pts.length - 1; i++) nx.push(pts[i], (pts[i] + pts[i + 1]) / 2 + (rand() - 0.5) * disp);
-        nx.push(pts[pts.length - 1]);
-        pts = nx;
-        disp *= rough;
-      }
-      return pts;
-    }
-    const groundY = x => H * (0.862 + 0.018 * Math.sin((x / W) * 3.3 + 0.4) + 0.011 * Math.sin((x / W) * 8.1 + 2.1));
+    const hex = h => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+    const BAYER = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5].map(v => (v + 0.5) / 16);
+    const bay = (x, y) => BAYER[(y & 3) * 4 + (x & 3)];
+    const STAR = ["#5b4e7e", "#a99bd0", "#f4efff"];
+    const TENT = ["...a...", "..aaa..", ".aabaa.", "aabbbaa", "aabbbaa"];
 
-    function layer() {
+    function canvas(w, h) {
       const c = document.createElement("canvas");
-      c.width = cv.width;
-      c.height = cv.height;
-      const g = c.getContext("2d");
-      g.setTransform(dpr, 0, 0, dpr, 0, 0);
-      return [c, g];
+      c.width = w;
+      c.height = h;
+      return c;
+    }
+    function put(img, x, y, rgb) {
+      const i = (y * img.width + x) * 4;
+      img.data[i] = rgb[0];
+      img.data[i + 1] = rgb[1];
+      img.data[i + 2] = rgb[2];
+      img.data[i + 3] = 255;
+    }
+
+    /* gökyüzü: titreşimli (dither) renk geçişi, bulutsu bandı ve halkalı gezegen */
+    function planetSpec() {
+      return { cx: Math.round(aw * 0.74), cy: Math.round(ah * 0.29), r: Math.max(7, Math.round(ah * 0.12)) };
+    }
+    function buildSky() {
+      const c = canvas(aw, ah);
+      const cg = c.getContext("2d");
+      const img = cg.createImageData(aw, ah);
+      const stops = ["#07050f", "#100a22", "#1f1039", "#361553", "#53206d"].map(hex);
+      const at = [0, 0.3, 0.52, 0.7, 0.84];
+      const neb = [hex("#2b1a50"), hex("#1b3150")];
+      for (let y = 0; y < ah; y++) {
+        const f = y / ah;
+        let i = 0;
+        while (i < at.length - 2 && f > at[i + 1]) i++;
+        const lt = Math.max(0, Math.min(1, (f - at[i]) / (at[i + 1] - at[i])));
+        for (let x = 0; x < aw; x++) {
+          let col = lt > bay(x, y) ? stops[i + 1] : stops[i];
+          const by = ah * (0.1 + 0.3 * (x / aw));
+          const band = Math.exp(-Math.pow((y - by) / (ah * 0.09), 2));
+          const tex = 0.55 + 0.45 * Math.sin(x * 0.11 + y * 0.05) * Math.sin(x * 0.037 - y * 0.13);
+          if (f < 0.6 && band * tex * 0.6 > bay(x + 1, y + 2)) col = neb[x / aw > 0.5 + 0.12 * bay(y, x) ? 1 : 0];
+          put(img, x, y, col);
+        }
+      }
+      cg.putImageData(img, 0, 0);
+      drawPlanet(cg);
+      return c;
+    }
+    function drawPlanet(cg) {
+      const { cx, cy, r } = planetSpec();
+      const bands = ["#3a2766", "#55388a", "#7a53b0", "#a07bd3", "#6a4a9f", "#4a3279"];
+      const ringIn = r * 1.32, ringOut = r * 1.95, flat = 0.28;
+      const ca = Math.cos(-0.32), sa = Math.sin(-0.32);
+      const R = Math.ceil(ringOut);
+      const ring = front => {
+        for (let y = cy - R; y <= cy + R; y++) {
+          for (let x = cx - R; x <= cx + R; x++) {
+            const dx = x - cx, dy = y - cy;
+            const u = dx * ca + dy * sa;
+            const w = (-dx * sa + dy * ca) / flat;
+            const d = Math.hypot(u, w);
+            if (d < ringIn || d > ringOut || (w >= 0) !== front) continue;
+            if (!front && dx * dx + dy * dy <= r * r) continue;
+            const k = (d - ringIn) / (ringOut - ringIn);
+            if (k > 0.55 && k < 0.64) continue;
+            cg.fillStyle = k < 0.55 ? "#8f74c0" : "#cdb6ec";
+            cg.fillRect(x, y, 1, 1);
+          }
+        }
+      };
+      ring(false);
+      for (let y = cy - r; y <= cy + r; y++) {
+        for (let x = cx - r; x <= cx + r; x++) {
+          const dx = x - cx + 0.5, dy = y - cy + 0.5;
+          if (dx * dx + dy * dy > r * r) continue;
+          const nx = dx / r, ny = dy / r;
+          const nz = Math.sqrt(Math.max(0, 1 - nx * nx - ny * ny));
+          const light = -0.55 * nx - 0.45 * ny + 0.7 * nz;
+          const b = Math.floor((ny * 0.5 + 0.5) * bands.length + 0.6 * Math.sin(nx * 2.4 + ny * 5));
+          let col = bands[Math.max(0, Math.min(bands.length - 1, b))];
+          if (light < 0.35 + 0.3 * bay(x, y)) col = "#1d1436";
+          else if (light > 0.95 && nx < -0.35) col = "#d9c6f2";
+          cg.fillStyle = col;
+          cg.fillRect(x, y, 1, 1);
+        }
+      }
+      ring(true);
+    }
+    function buildStars() {
+      const sr = rng(37);
+      const { cx, cy, r } = planetSpec();
+      stars = [];
+      const n = Math.round((aw * ah) / 85);
+      for (let i = 0; i < n; i++) {
+        const x = Math.floor(sr() * aw);
+        const y = Math.floor(Math.pow(sr(), 1.3) * ah * 0.62);
+        const k = sr(), tw = sr() < 0.25, ph = sr() * 6.28, sp = 1.5 + sr() * 3;
+        if (Math.hypot(x - cx, (y - cy) * 1.6) < r * 2.1) continue;
+        stars.push({ x, y, lvl: k < 0.62 ? 0 : k < 0.92 ? 1 : 2, tw, ph, sp });
+      }
+    }
+
+    /* kayan katmanlar: uzak dağlar, tepeler, yol kenarı */
+    function ridgeStrip(P, base, amp, terms, body, top, snow, snowLine, seed) {
+      const c = canvas(P, ah);
+      const cg = c.getContext("2d");
+      const img = cg.createImageData(P, ah);
+      const rr = rng(seed);
+      const phases = terms.map(() => rr() * 6.283);
+      const tops = [];
+      for (let x = 0; x < P; x++) {
+        let h = 0;
+        terms.forEach(([k, w], i) => { h += w * (1 - Math.abs(Math.sin((Math.PI * k * x) / P + phases[i]))); });
+        const y0 = Math.round(base - amp * h);
+        tops.push(y0);
+        for (let y = Math.max(0, y0); y < ah; y++) {
+          let col = body;
+          if (snow && y0 < snowLine && y - y0 <= 1 + ((x * 7) % 5 === 0 ? 1 : 0)) col = snow;
+          else if (y === y0) col = top;
+          put(img, x, y, col);
+        }
+      }
+      cg.putImageData(img, 0, 0);
+      return { c, tops };
+    }
+    function nearStrip(P) {
+      const c = canvas(P, ah);
+      const cg = c.getContext("2d");
+      const rr = rng(77);
+      cg.fillStyle = "#120a1b";
+      cg.fillRect(0, roadTop - 3, P, 3);
+      for (let x = 0; x < P; x++) {
+        const v = rr();
+        if (v < 0.2) { cg.fillStyle = "#2a1a3a"; cg.fillRect(x, roadTop - 4, 1, 1); }
+        else if (v < 0.24) { cg.fillStyle = "#3b2a4c"; cg.fillRect(x, roadTop - 5, 2, 2); }
+      }
+      return c;
+    }
+
+    /* motosiklet ve sürücü: 32x22 piksellik sprite, iki tekerlek karesi */
+    function buildBike(frame) {
+      const c = canvas(32, 22);
+      const b = c.getContext("2d");
+      const R = (x, y, w, h, col) => { b.fillStyle = col; b.fillRect(x, y, w, h); };
+      const WHEEL = [
+        "...kkkkk...",
+        ".kkkrrrkkk.",
+        ".kkr...rkk.",
+        "kkr.....rkk",
+        "kr.......rk",
+        "kr.......rk",
+        "kr.......rk",
+        "kkr.....rkk",
+        ".kkr...rkk.",
+        ".kkkrrrkkk.",
+        "...kkkkk..."
+      ];
+      const SPOKES = frame
+        ? [[5, 3], [5, 4], [5, 6], [5, 7], [3, 5], [4, 5], [6, 5], [7, 5]]
+        : [[3, 3], [4, 4], [6, 6], [7, 7], [7, 3], [6, 4], [4, 6], [3, 7]];
+      const wheel = (ox, oy) => {
+        WHEEL.forEach((row, y) => [...row].forEach((ch, x) => {
+          if (ch !== ".") R(ox + x, oy + y, 1, 1, ch === "k" ? "#0b0814" : "#8a78a6");
+        }));
+        SPOKES.forEach(([x, y]) => R(ox + x, oy + y, 1, 1, "#4b3d60"));
+        R(ox + 5, oy + 5, 1, 1, "#cbbde0");
+      };
+      const k = "#0b0814", m = "#6d6080", gD = "#2a2235", gM = "#3e3450", ws = "#7d6a9c", lamp = "#fff1b8";
+      const bag = "#3a2f47", strap = "#5e4f73", helm = "#efe8f5", helmS = "#b6a8c9", visor = "#1d1533";
+      const coat = "#ab44c7", coatS = "#7b2b93", pants = "#2b2238", boot = "#0f0b16";
+      wheel(2, 11);
+      wheel(20, 11);
+      R(11, 14, 2, 1, m); R(9, 15, 2, 1, m); R(8, 16, 1, 1, m);
+      R(22, 7, 1, 2, m); R(23, 9, 1, 1, m); R(23, 10, 2, 2, m); R(24, 12, 1, 1, m); R(24, 13, 2, 2, m); R(25, 15, 1, 1, m);
+      R(24, 9, 4, 1, gM); R(25, 10, 4, 1, gD);
+      R(23, 6, 3, 3, gD); R(25, 7, 2, 2, lamp);
+      R(22, 2, 2, 2, ws); R(23, 4, 2, 2, ws);
+      R(13, 10, 7, 4, gD); R(14, 11, 4, 1, gM); R(13, 14, 8, 1, m);
+      R(15, 8, 6, 2, gM); R(16, 7, 4, 1, gM); R(16, 7, 3, 1, m);
+      R(10, 9, 6, 1, k); R(5, 8, 6, 1, gD); R(4, 8, 1, 1, "#ff8a3c");
+      R(5, 5, 4, 3, bag); R(4, 6, 6, 1, bag); R(6, 5, 1, 3, strap); R(8, 5, 1, 3, strap);
+      R(3, 9, 8, 4, bag); R(3, 9, 8, 1, strap); R(6, 9, 1, 4, strap);
+      R(20, 6, 2, 1, k);
+      R(16, 13, 3, 2, boot); R(17, 11, 2, 2, pants); R(13, 9, 5, 2, pants); R(18, 10, 1, 1, pants);
+      R(13, 5, 5, 1, coat); R(12, 6, 6, 1, coat); R(12, 7, 5, 1, coat); R(12, 8, 4, 1, coatS); R(12, 6, 1, 3, coatS);
+      R(17, 5, 2, 1, coat); R(18, 6, 2, 1, coat); R(20, 6, 1, 1, boot);
+      R(14, 0, 4, 1, helm); R(13, 1, 6, 1, helm); R(18, 1, 3, 1, helm); R(13, 2, 4, 1, helm); R(17, 2, 2, 1, visor);
+      R(13, 3, 4, 1, helmS); R(17, 3, 1, 1, visor); R(18, 3, 1, 1, helm); R(14, 4, 4, 1, helmS);
+      return c;
     }
 
     function build() {
       const r = cv.getBoundingClientRect();
-      W = Math.max(1, r.width);
-      H = Math.max(1, r.height);
-      dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-      cv.width = Math.round(W * dpr);
-      cv.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      u = Math.max(7.5, Math.min(12, W * 0.026));
-
-      let g;
-      [sky, g] = layer();
-      const sg = g.createLinearGradient(0, 0, 0, H);
-      sg.addColorStop(0, "#08060c");
-      sg.addColorStop(0.42, "#130b1e");
-      sg.addColorStop(0.7, "#2c1239");
-      sg.addColorStop(1, "#1b0e23");
-      g.fillStyle = sg;
-      g.fillRect(0, 0, W, H);
-      const dusk = g.createRadialGradient(W * 0.3, H * 0.72, 0, W * 0.3, H * 0.72, W * 0.8);
-      dusk.addColorStop(0, "rgba(171, 68, 199, 0.5)");
-      dusk.addColorStop(0.4, "rgba(171, 68, 199, 0.16)");
-      dusk.addColorStop(1, "rgba(171, 68, 199, 0)");
-      g.fillStyle = dusk;
-      g.fillRect(0, 0, W, H);
-
-      const starRand = rng(37);
-      stars = [];
-      const n = Math.round((W * H) / 800);
-      for (let i = 0; i < n; i++) {
-        stars.push({
-          x: starRand() * W,
-          y: Math.pow(starRand(), 1.5) * H * 0.66,
-          r: 0.35 + starRand() * 0.9,
-          a: 0.25 + starRand() * 0.7,
-          s: 0.5 + starRand() * 1.8,
-          p: starRand() * 6.283
-        });
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const dw = Math.max(2, Math.round(r.width * dpr));
+      const dh = Math.max(2, Math.round(r.height * dpr));
+      cv.width = dw;
+      cv.height = dh;
+      s = Math.max(2, Math.round(dw / 168));
+      aw = Math.ceil(dw / s);
+      ah = Math.ceil(dh / s);
+      off.width = aw;
+      off.height = ah;
+      const roadH = Math.max(10, Math.round(ah * 0.15));
+      roadTop = ah - roadH;
+      contactY = roadTop + Math.round(roadH * 0.72);
+      sky = buildSky();
+      buildStars();
+      far = ridgeStrip(aw * 2, Math.round(ah * 0.66), ah * 0.32, [[3, 0.5], [7, 0.3], [17, 0.2]],
+        hex("#2a1a40"), hex("#4f3570"), null, 0, 900);
+      mid = ridgeStrip(aw * 2, roadTop - 2, ah * 0.17, [[2, 0.6], [5, 0.3], [11, 0.1]],
+        hex("#1a0f28"), hex("#36204e"), null, 0, 412);
+      near = nearStrip(aw * 2);
+      frames = [buildBike(0), buildBike(1)];
+      const P = mid.c.width;
+      let best = Math.round(P * 0.18), score = Infinity;
+      for (let x = Math.round(P * 0.14); x < Math.round(P * 0.26); x++) {
+        const sc = Math.abs(mid.tops[x + 4] - mid.tops[x - 4]);
+        if (sc < score) { score = sc; best = x; }
       }
-
-      const ridgeRand = rng(900);
-      [land, g] = layer();
-      [[0.55, 0.3, 0.58, "#2a1c3a"], [0.69, 0.2, 0.52, "#1a1226"]].forEach(([base, amp, rough, col]) => {
-        const pts = ridge(ridgeRand, base * H, amp * H, rough);
-        g.beginPath();
-        g.moveTo(0, H);
-        pts.forEach((y, i) => g.lineTo((i / (pts.length - 1)) * W, y));
-        g.lineTo(W, H);
-        g.closePath();
-        g.fillStyle = col;
-        g.fill();
-        const hz = g.createLinearGradient(0, (base - amp * 0.3) * H, 0, H);
-        hz.addColorStop(0, "rgba(171, 68, 199, 0)");
-        hz.addColorStop(1, "rgba(171, 68, 199, 0.12)");
-        g.fillStyle = hz;
-        g.fill();
-      });
-      g.beginPath();
-      g.moveTo(0, H);
-      for (let x = 0; x <= W + 4; x += 4) g.lineTo(x, groundY(x));
-      g.lineTo(W, H);
-      g.closePath();
-      g.fillStyle = "#0c0910";
-      g.fill();
+      campX = best;
     }
 
-    const flick = (t, k) => 0.86 + 0.07 * Math.sin(t * 7.3 + k) + 0.05 * Math.sin(t * 13.1 + k * 2.1) + 0.02 * Math.sin(t * 29.7 + k * 0.7);
-
-    function glow(x, y, rad, rgb, a) {
-      const rg = ctx.createRadialGradient(x, y, 0, x, y, rad);
-      rg.addColorStop(0, `rgba(${rgb}, ${a})`);
-      rg.addColorStop(1, `rgba(${rgb}, 0)`);
-      ctx.fillStyle = rg;
-      ctx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+    function tile(c, o) {
+      const P = c.width;
+      const x = -(((o % P) + P) % P);
+      g.drawImage(c, x, 0);
+      g.drawImage(c, x + P, 0);
     }
-
-    function rrect(x, y, w, h, rad) {
-      ctx.beginPath();
-      ctx.moveTo(x + rad, y);
-      ctx.arcTo(x + w, y, x + w, y + h, rad);
-      ctx.arcTo(x + w, y + h, x, y + h, rad);
-      ctx.arcTo(x, y + h, x, y, rad);
-      ctx.arcTo(x, y, x + w, y, rad);
-      ctx.closePath();
-    }
-
-    /* yandan motosiklet silueti, ön teker solda; birim = teker yarıçapı */
-    function bike(x0, gy) {
-      const r = u;
-      const P = (x, y) => [x0 + x * r, gy - y * r];
-      ctx.save();
-      ctx.fillStyle = "#060509";
-      ctx.strokeStyle = "#060509";
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-      ctx.lineWidth = r * 0.34;
-      ctx.beginPath(); ctx.arc(...P(0, 1.06), r * 0.9, 0, 6.2832); ctx.stroke();
-      ctx.beginPath(); ctx.arc(...P(4.4, 1.0), r * 0.84, 0, 6.2832); ctx.stroke();
-      ctx.lineWidth = r * 0.3;
-      ctx.beginPath(); ctx.moveTo(...P(0, 1.06)); ctx.lineTo(...P(0.92, 3.15)); ctx.stroke();
-      ctx.lineWidth = r * 0.34;
-      ctx.beginPath(); ctx.moveTo(...P(2.95, 1.55)); ctx.lineTo(...P(4.4, 1.0)); ctx.stroke();
-      const body = [[0.92, 3.15], [0.62, 2.95], [0.68, 3.5], [1.02, 4.2], [1.28, 3.7], [1.6, 3.66], [1.8, 3.32], [2.6, 3.12], [2.8, 2.74], [3.75, 2.8], [4.4, 3.02], [4.55, 2.95], [4.05, 2.55], [2.95, 1.6], [2.6, 1.1], [1.45, 1.05], [1.05, 1.8], [0.85, 2.85]];
-      ctx.beginPath();
-      body.forEach(([x, y], i) => {
-        const [px, py] = P(x, y);
-        if (i) ctx.lineTo(px, py); else ctx.moveTo(px, py);
-      });
-      ctx.closePath();
-      ctx.fill();
-      const [bx, by] = P(3.62, 3.55);
-      rrect(bx, by, r * 1.3, r * 0.74, r * 0.3);
-      ctx.fill();
-      ctx.lineWidth = r * 0.2;
-      ctx.beginPath(); ctx.moveTo(...P(1.5, 3.62)); ctx.lineTo(...P(1.86, 4.05)); ctx.stroke();
-      ctx.restore();
-    }
-
-    function tent(cx, gy, f) {
-      const w = u * 5.2, h = u * 4.1;
-      ctx.strokeStyle = `rgba(255, 186, 120, ${0.3 * f})`;
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(cx, gy - h); ctx.lineTo(cx - w * 0.98, gy + 0.5);
-      ctx.moveTo(cx, gy - h); ctx.lineTo(cx + w * 0.98, gy + 0.5);
-      ctx.stroke();
-      const shape = () => {
-        ctx.beginPath();
-        ctx.moveTo(cx, gy - h);
-        ctx.lineTo(cx + w / 2, gy);
-        ctx.lineTo(cx - w / 2, gy);
-        ctx.closePath();
-      };
-      const lg = ctx.createLinearGradient(0, gy - h, 0, gy);
-      lg.addColorStop(0, "#ffd08a");
-      lg.addColorStop(1, "#ff8a3c");
-      shape(); ctx.fillStyle = lg; ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(cx, gy - h); ctx.lineTo(cx + w / 2, gy); ctx.lineTo(cx + w * 0.1, gy);
-      ctx.closePath();
-      ctx.fillStyle = "rgba(110, 34, 12, 0.3)";
-      ctx.fill();
-      ctx.beginPath();
-      ctx.moveTo(cx, gy - h * 0.6); ctx.lineTo(cx + w * 0.13, gy); ctx.lineTo(cx - w * 0.13, gy);
-      ctx.closePath();
-      ctx.fillStyle = "#fff3d2";
-      ctx.fill();
-      shape(); ctx.fillStyle = `rgba(12, 9, 16, ${Math.max(0, (1 - f) * 1.3)})`; ctx.fill();
-    }
-
-    function fire(x, gy, t, still) {
-      [["#ff6a2a", 1], ["#ffa13d", 0.72], ["#ffe39a", 0.42]].forEach(([c, s], i) => {
-        const sway = still ? 0 : Math.sin(t * 6.1 + i * 1.3) * u * 0.14 * s + Math.sin(t * 11.3 + i) * u * 0.06;
-        const h = u * 2.1 * s * (still ? 1 : 0.9 + 0.12 * Math.sin(t * 9.7 + i * 2.2));
-        const w = u * 0.78 * s;
-        const b = gy - u * 0.22;
-        ctx.fillStyle = c;
-        ctx.beginPath();
-        ctx.moveTo(x - w, b);
-        ctx.quadraticCurveTo(x - w * 1.05, b - h * 0.55, x + sway, b - h);
-        ctx.quadraticCurveTo(x + w * 1.05, b - h * 0.55, x + w, b);
-        ctx.closePath();
-        ctx.fill();
-      });
-      ctx.strokeStyle = "#1c100b";
-      ctx.lineWidth = u * 0.3;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(x - u * 0.95, gy - u * 0.08); ctx.lineTo(x + u * 0.95, gy - u * 0.42);
-      ctx.moveTo(x - u * 0.95, gy - u * 0.42); ctx.lineTo(x + u * 0.95, gy - u * 0.08);
-      ctx.stroke();
-    }
-
-    function stepSparks(dt, x, gy) {
-      if (sparks.length < 8 && Math.random() < dt * 4) {
-        sparks.push({
-          x: x + (Math.random() - 0.5) * u * 0.6,
-          y: gy - u * 1.8,
-          vx: (Math.random() - 0.5) * u * 0.8,
-          vy: -u * (1.8 + Math.random() * 1.8),
-          life: 0,
-          max: 0.8 + Math.random() * 0.9
-        });
+    function drawStars(t, still) {
+      for (const st of stars) {
+        let lvl = st.lvl;
+        const w = Math.sin(t * st.sp + st.ph);
+        if (st.tw && !still) {
+          if (w > 0.7) lvl = Math.min(2, lvl + 1);
+          else if (w < -0.7) lvl = Math.max(0, lvl - 1);
+        }
+        g.fillStyle = STAR[lvl];
+        g.fillRect(st.x, st.y, 1, 1);
+        if (lvl === 2 && st.tw && (still || w > 0.7)) {
+          g.fillStyle = STAR[0];
+          g.fillRect(st.x - 1, st.y, 1, 1);
+          g.fillRect(st.x + 1, st.y, 1, 1);
+          g.fillRect(st.x, st.y - 1, 1, 1);
+          g.fillRect(st.x, st.y + 1, 1, 1);
+        }
       }
-      ctx.fillStyle = "#ffc46e";
-      sparks = sparks.filter(s => {
-        s.life += dt;
-        s.x += s.vx * dt;
-        s.y += s.vy * dt;
-        const k = 1 - s.life / s.max;
-        if (k <= 0) return false;
-        ctx.globalAlpha = k * 0.9;
-        ctx.fillRect(s.x, s.y, 1.4, 1.4);
-        return true;
+    }
+    function shootingStar(t) {
+      if (!shoot && t > nextShoot) {
+        shoot = { x: aw * (0.2 + Math.random() * 0.7), y: 2 + Math.random() * ah * 0.22, t0: t };
+      }
+      if (!shoot) return;
+      const age = t - shoot.t0;
+      if (age > 0.8) {
+        shoot = null;
+        nextShoot = t + 3 + Math.random() * 5;
+        return;
+      }
+      const hx = Math.round(shoot.x - 80 * age), hy = Math.round(shoot.y + 40 * age);
+      ["#f4efff", "#d6c8f0", "#a99bd0", "#7a6aa2", "#5b4e7e"].forEach((c, i) => {
+        g.fillStyle = c;
+        g.fillRect(hx + i * 2, hy - i, 2, 1);
       });
-      ctx.globalAlpha = 1;
+    }
+    function campsite(oMid, t, still) {
+      const P = mid.c.width;
+      const gy = mid.tops[campX] + 1;
+      const base = campX - (((oMid % P) + P) % P);
+      for (const x0 of [base, base + P]) {
+        if (x0 < -14 || x0 > aw + 4) continue;
+        g.fillStyle = "#4a2440";
+        for (let i = -6; i <= 10; i++) {
+          for (let j = -4; j <= 1; j++) {
+            if (((x0 + i + gy + j) & 1) === 0 && Math.abs(i - 3) + Math.abs(j) * 2 < 8) g.fillRect(x0 + i, gy + j, 1, 1);
+          }
+        }
+        TENT.forEach((row, y) => [...row].forEach((ch, x) => {
+          if (ch === ".") return;
+          g.fillStyle = ch === "a" ? "#ff9d4d" : "#fff0c4";
+          g.fillRect(x0 + x, gy - 5 + y, 1, 1);
+        }));
+        const flick = still ? 0 : Math.floor(t * 9) % 2;
+        g.fillStyle = "#ff6a2a";
+        g.fillRect(x0 + 9, gy - 1, 1, 1);
+        g.fillStyle = flick ? "#ffd27a" : "#ff8a3c";
+        g.fillRect(x0 + 9, gy - 2, 1, 1);
+      }
+    }
+    function road(o) {
+      g.fillStyle = "#4a3a5e";
+      g.fillRect(0, roadTop, aw, 1);
+      g.fillStyle = "#1a1324";
+      g.fillRect(0, roadTop + 1, aw, ah - roadTop - 1);
+      g.fillStyle = "#0f0a17";
+      g.fillRect(0, ah - 1, aw, 1);
+      g.fillStyle = "#cdbf9e";
+      const dy = roadTop + Math.round((ah - roadTop) * 0.36);
+      for (let x = -(o % 12); x < aw; x += 12) g.fillRect(x, dy, 6, 1);
+      for (let x = 20 - (o % 46); x < aw; x += 46) {
+        g.fillStyle = "#6e5a8a";
+        g.fillRect(x, roadTop - 5, 1, 5);
+        g.fillStyle = "#ff9a4a";
+        g.fillRect(x, roadTop - 5, 1, 1);
+      }
+    }
+    function beam(bx, by) {
+      const x0 = bx + 27, y0 = by + 8;
+      g.fillStyle = "#fff1c4";
+      for (let dx = 1; dx <= 46; dx++) {
+        const half = Math.floor(dx * 0.2);
+        const cy = y0 + Math.floor(dx * 0.1);
+        g.globalAlpha = 0.26 * (1 - dx / 48);
+        for (let yy = cy - half; yy <= cy + half && yy <= contactY + 1; yy++) {
+          if (((x0 + dx + yy) & 1) === 0) g.fillRect(x0 + dx, yy, 1, 1);
+        }
+      }
+      g.globalAlpha = 1;
     }
 
-    function draw(t, dt) {
+    function draw(t) {
       const still = reduceMQ.matches;
-      ctx.clearRect(0, 0, W, H);
-      ctx.drawImage(sky, 0, 0, W, H);
-      ctx.fillStyle = "#f3ecff";
-      for (const s of stars) {
-        ctx.globalAlpha = still ? s.a : Math.max(0, s.a * (0.62 + 0.38 * Math.sin(t * s.s + s.p)));
-        ctx.beginPath();
-        ctx.arc(s.x, s.y, s.r, 0, 6.2832);
-        ctx.fill();
-      }
-      ctx.globalAlpha = 1;
-      ctx.drawImage(land, 0, 0, W, H);
-
-      const tx = W * 0.68, ty = groundY(tx);
-      const fx = tx + u * 4.9, fy = groundY(fx);
-      const bx = tx - u * 8.8, by = groundY(bx + u * 2.2);
-      const f1 = still ? 1 : flick(t, 0);
-      const f2 = still ? 1 : flick(t, 1.7);
-
-      ctx.globalCompositeOperation = "lighter";
-      glow(tx, ty - u * 1.6, u * 12, "255, 150, 70", 0.26 * f1);
-      glow(fx, fy - u * 0.8, u * 7.5, "255, 120, 40", 0.34 * f2);
-      ctx.globalCompositeOperation = "source-over";
-
-      bike(bx, by);
-      tent(tx, ty, f1);
-      fire(fx, fy, t, still);
-      if (!still) stepSparks(dt, fx, fy);
+      g.drawImage(sky, 0, 0);
+      drawStars(t, still);
+      if (!still) shootingStar(t);
+      const oRoad = Math.floor(t * SPEED);
+      const oMid = Math.floor(t * SPEED * 0.35);
+      tile(far.c, Math.floor(t * SPEED * 0.12));
+      tile(mid.c, oMid);
+      campsite(oMid, t, still);
+      tile(near, oRoad);
+      road(oRoad);
+      const bx = Math.round(aw * 0.56);
+      const by = contactY - 21 + (!still && Math.floor(t * 3) % 5 === 0 ? -1 : 0);
+      beam(bx, by);
+      g.fillStyle = "rgba(0, 0, 0, 0.45)";
+      g.fillRect(bx + 3, contactY + 1, 27, 1);
+      g.drawImage(frames[Math.floor(oRoad / 3) % 2], bx, by);
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.imageSmoothingEnabled = false;
+      ctx.drawImage(off, 0, 0, aw * s, ah * s);
     }
 
     function loop(now) {
       rafId = 0;
       if (!onScreen || reduceMQ.matches || document.hidden) return;
+      if (!t0) t0 = now;
       if (now - lastDraw >= 33) {
-        const dt = lastDraw ? Math.min(0.1, (now - lastDraw) / 1000) : 0;
         lastDraw = now;
-        tNow = now / 1000;
-        draw(tNow, dt);
+        tNow = (now - t0) / 1000;
+        draw(tNow);
       }
       rafId = requestAnimationFrame(loop);
     }
     function start() {
-      if (!rafId && onScreen && !reduceMQ.matches && !document.hidden) {
-        lastDraw = 0;
-        rafId = requestAnimationFrame(loop);
-      }
+      if (!rafId && onScreen && !reduceMQ.matches && !document.hidden) rafId = requestAnimationFrame(loop);
     }
 
     build();
-    draw(0, 0);
+    draw(0);
 
     if ("ResizeObserver" in window) {
-      let lastW = W, lastH = H;
+      const first = cv.getBoundingClientRect();
+      let lastW = first.width, lastH = first.height;
       new ResizeObserver(() => {
         const r = cv.getBoundingClientRect();
         if (Math.abs(r.width - lastW) < 0.5 && Math.abs(r.height - lastH) < 0.5) return;
         lastW = r.width;
         lastH = r.height;
         build();
-        draw(tNow, 0);
+        draw(tNow);
       }).observe(cv);
     } else {
-      window.addEventListener("resize", () => { build(); draw(tNow, 0); });
+      window.addEventListener("resize", () => { build(); draw(tNow); });
     }
     if ("IntersectionObserver" in window) {
       new IntersectionObserver(entries => {
@@ -1161,7 +1255,7 @@ body {
       }).observe(cv);
     }
     document.addEventListener("visibilitychange", () => { if (!document.hidden) start(); });
-    const onMotionPref = () => { draw(tNow, 0); start(); };
+    const onMotionPref = () => { draw(tNow); start(); };
     if (reduceMQ.addEventListener) reduceMQ.addEventListener("change", onMotionPref);
     else if (reduceMQ.addListener) reduceMQ.addListener(onMotionPref);
     start();
