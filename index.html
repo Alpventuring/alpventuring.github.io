@@ -545,7 +545,7 @@ body {
   const LIVE_HOURS = 3;                                   // yayından sonra kaç saat "Yeni video yayında" yazsın
 
   /* Ekipman: her satır { z: figürdeki bölge, k: etiket, v: model }.
-     Bölgeler: kask, mont, eldiven, pantolon, bot, boyun. Bölgesi olmayan satırlar (çanta gibi) yalnızca listede durur.
+     Bölgeler: kask, mont, eldiven, pantolon, bot, boyun. Bölgesi olmayan satırlar (yağmur seti gibi) yalnızca listede durur.
      Türkçe ve İngilizcesi farklıysa L("türkçe", "english") yaz. */
   const L = (tr, en) => ({ tr, en });
   const HELMETS = "HJC i80 · Arai Concept-X";
@@ -580,7 +580,6 @@ body {
         { z: "eldiven", k: L("Eldiven", "Gloves"), v: "Klim Marrakesh" },
         { z: "pantolon", k: L("Pantolon", "Pants"), v: "Dainese Carve Master 3 Gore-Tex" },
         { z: "bot", k: L("Bot", "Boots"), v: BOOTS },
-        { k: L("Çanta", "Bags"), v: L("Rhinowalk Mechanical 8L crash bar çantaları", "Rhinowalk Mechanical 8L crash bar bags") },
         { k: L("Yağmur", "Rain"), v: L("Rev'it yağmur pantolonu · Decathlon yağmurluk", "Rev'it rain pants · Decathlon rain jacket") }
       ]
     }
