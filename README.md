@@ -2,7 +2,7 @@
 
 Yayın adresi: https://alpventuring.github.io
 
-Instagram ve YouTube bio'sundaki link sayfası. Sitenin tamamı tek dosya: `index.html`.
+Instagram ve YouTube bio'sundaki link sayfası. Sayfanın tamamı `index.html`; logo `logo.webp`.
 
 ## Sık yapılan değişiklikler
 
